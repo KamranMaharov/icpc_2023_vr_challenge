@@ -115,8 +115,18 @@ public class Main {
 			}
 			
 			for (int k=0; k<K; k++) { // cell
+				
+				
+				//int chosenUser = 0;
+				
 				for (int r=0; r<R; r++) { //freq rbg
+					//chosenUser++;
 					
+					
+					
+					double sumDebugger = 0.0;
+					
+					int currentUser = 0;
 					
 					// 4.0 / N -> power range for each RBG -> [0; 4]
 					// 1.0 / N -> power range for all RBGs -> [0; R]
@@ -124,9 +134,30 @@ public class Main {
 					
 					for (int n=0; n<N; n++) {
 						if (userTime[n][t]) {
-							out.write((1.0 / activeUsers) + " ");
+							
+							if (R >= activeUsers) {
+							
+								if (currentUser == r % activeUsers) {
+									//out.write(Math.min(4.0, 1.0 * R / activeUsers) + " ");
+									out.write(1.0 + " ");
+									sumDebugger += 1.0;
+								} else {
+									out.write(0.0 + " ");
+									sumDebugger += 0.0;
+								}
+								currentUser++;
+							
+							
+							} else {
+								out.write((1.0 / activeUsers) + " ");
+								sumDebugger += (1.0 / activeUsers);
+							}
+							
+							
+							//out.write((1.0 / activeUsers) + " ");
 						} else {
 							out.write(0.0 + " ");
+							sumDebugger += 0.0;
 						}
 						
 						
@@ -141,15 +172,30 @@ public class Main {
 						
 						//xxx
 						
+					} // users (n)
+					
+					if (activeUsers > 0) {
+					
+						if (sumDebugger < 0.999999 || sumDebugger > 1.000001) {
+							throw new IllegalArgumentException("a b c d e");
+						}
+					} else {
+						if (sumDebugger > 1e-9) {
+							throw new IllegalArgumentException("a b c d e");
+						}
 					}
+					
 					out.write("\n");
 					
 					
 					//xxx * N * R <= R
-				}
-			}
-		}
+				} //rgb (freq resource, r)
+			} // cells (k)
+		} // time (t)
 		
+		//if (R >= N) {
+		//	throw new IllegalArgumentException("a b c d e");
+		//}
 		
 		in.close();
 		out.close();
