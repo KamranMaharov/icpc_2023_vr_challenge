@@ -135,24 +135,15 @@ public class Main {
 					for (int n=0; n<N; n++) {
 						if (userTime[n][t]) {
 							
-							if (R >= activeUsers) {
-							
-								if (currentUser == r % activeUsers) {
-									//out.write(Math.min(4.0, 1.0 * R / activeUsers) + " ");
-									out.write(1.0 + " ");
-									sumDebugger += 1.0;
-								} else {
-									out.write(0.0 + " ");
-									sumDebugger += 0.0;
-								}
-								currentUser++;
-							
-							
+							if (currentUser == r % activeUsers) {
+								//out.write(Math.min(4.0, 1.0 * R / activeUsers) + " ");
+								out.write(1.0 + " ");
+								sumDebugger += 1.0;
 							} else {
-								out.write((1.0 / activeUsers) + " ");
-								sumDebugger += (1.0 / activeUsers);
+								out.write(0.0 + " ");
+								sumDebugger += 0.0;
 							}
-							
+							currentUser++;
 							
 							//out.write((1.0 / activeUsers) + " ");
 						} else {
@@ -160,17 +151,6 @@ public class Main {
 							sumDebugger += 0.0;
 						}
 						
-						
-						/*if (N == 2 && K == 2 && T == 2) {
-							//out.write((1.0 / N) + " ");
-						} else {
-							//out.write((1.0 / N + 1e-6) + " ");
-							//1e-8 is ok.
-							//1e-7, 2 incorrect answers
-							//1e-6, 48 incorrect answers
-						} */
-						
-						//xxx
 						
 					} // users (n)
 					
