@@ -114,6 +114,67 @@ public class Main {
 				}
 			}
 			
+			double[][] urPoints = new double[N][R];
+			
+			for (int ux=0; ux<N; ux++) {
+				for (int r=0; r<R; r++) {
+					urPoints[ux][r] = 1.0;
+					
+					for (int k=0; k<K; k++) {
+						urPoints[ux][r] *= initSinr[t][k][r][ux];
+					}
+					
+				}
+			}
+			
+			int[] matchResource = new int[R];
+			int[] userMatchCnt = new int[N];
+			
+			
+			for (int r=0; r<R; r++) {
+				double max_value = -1.0;
+				matchResource[r] = -1;
+				int match_user = -1;
+				
+				int minCount = Integer.MAX_VALUE;
+				
+				for (int ux=0; ux<N; ux++) {	
+					if (!userTime[ux][t])
+						continue;
+					
+					if (userMatchCnt[ux] < minCount) {
+						minCount = userMatchCnt[ux];
+					}
+				}
+				
+				
+				for (int ux=0; ux<N; ux++) {	
+					if (!userTime[ux][t])
+						continue;
+					
+					
+					if (userMatchCnt[ux] == minCount &&
+							urPoints[ux][r] > max_value) {
+						max_value = urPoints[ux][r];
+						match_user = ux;
+					}
+				}
+				
+				
+				if (activeUsers > 0) {
+					
+					matchResource[r] = match_user;
+					userMatchCnt[match_user]++;
+					
+					if (max_value < 0.0) {
+						throw new IllegalArgumentException("no match!!!");
+					}
+				}
+			}
+			
+			
+			
+			
 			for (int k=0; k<K; k++) { // cell
 				
 				
@@ -121,31 +182,28 @@ public class Main {
 				
 				for (int r=0; r<R; r++) { //freq rbg
 					//chosenUser++;
+					//chosenUser++;
 					
 					
 					
 					double sumDebugger = 0.0;
 					
-					int currentUser = 0;
+					//int currentUser = 0;
 					
 					// 4.0 / N -> power range for each RBG -> [0; 4]
 					// 1.0 / N -> power range for all RBGs -> [0; R]
 					
 					
 					for (int n=0; n<N; n++) {
-						if (userTime[n][t]) {
+						
+						if (matchResource[r] == n) {
+							out.write(1.0 + " ");
+							sumDebugger += 1.0;
 							
-							if (currentUser == r % activeUsers) {
-								//out.write(Math.min(4.0, 1.0 * R / activeUsers) + " ");
-								out.write(1.0 + " ");
-								sumDebugger += 1.0;
-							} else {
-								out.write(0.0 + " ");
-								sumDebugger += 0.0;
-							}
-							currentUser++;
-							
-							//out.write((1.0 / activeUsers) + " ");
+							/*if (matchUser[n] != r) {
+								throw new IllegalArgumentException("match failure");
+							}*/
+
 						} else {
 							out.write(0.0 + " ");
 							sumDebugger += 0.0;
