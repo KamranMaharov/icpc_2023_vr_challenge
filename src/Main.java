@@ -87,8 +87,10 @@ public class Main {
 		int[] userId = new int[J]; // 0 <= n < N
 		int[] t0 = new int[J]; // 0 <= t < T
 		int[] td = new int[J]; // 1 <= td <= 100
+		double[] allocatedBits = new double[J];
 		
 		boolean[][] userTime = new boolean[N][T];
+		int[][] userTimeToFrame = new int[N][T];
 		
 		for (int i=0; i<J; i++) {
 			String[] line = in.readLine().split(" ");
@@ -98,9 +100,11 @@ public class Main {
 			userId[i] = Integer.parseInt(line[2]);
 			t0[i] = Integer.parseInt(line[3]);
 			td[i] = Integer.parseInt(line[4]);
+			allocatedBits[i] = 0.0;
 			
 			for (int tx=t0[i]; tx<t0[i]+td[i]; tx++) {
 				userTime[userId[i]][tx] = true;
+				userTimeToFrame[userId[i]][tx] = i;
 			}
 			
 			
@@ -260,6 +264,52 @@ public class Main {
 					//xxx * N * R <= R
 				} //rgb (freq resource, r)
 			} // cells (k)
+			
+			
+			
+			for (int ux=0; ux<N; ux++) {
+				
+				if (!userTime[ux][t])
+					continue;
+				
+				for (int k=0; k<K; k++) {
+					
+					double hasil = 1.0;
+					int activeRbg = 0;
+					
+					for (int r=0; r<R; r++) {
+						
+						if (matchResource[r] != ux)
+							continue;
+						
+						hasil *= initSinr[t][k][r][ux];
+						activeRbg++;
+					}
+					
+					if (activeRbg != 0) {
+						double stk = Math.pow(hasil, 1.0 / activeRbg);
+						
+						
+						allocatedBits[userTimeToFrame[ux][t]] += 192.0 * activeRbg * Math.log(1.0 + stk) / Math.log(2.0);
+						
+					}
+					
+				}
+				
+				if (allocatedBits[userTimeToFrame[ux][t]] >= tbs[userTimeToFrame[ux][t]]) {
+					int frameToDeactivate = userTimeToFrame[ux][t];
+					
+					
+					for (int tx=t0[frameToDeactivate];
+							tx<t0[frameToDeactivate]+td[frameToDeactivate]; tx++) {
+						userTime[ux][tx] = false;
+					}
+				}
+				
+			}
+			
+			
+			
 		} // time (t)
 		
 		//if (R >= N) {
