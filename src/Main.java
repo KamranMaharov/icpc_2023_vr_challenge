@@ -103,6 +103,37 @@ public class Main {
 				userTime[userId[i]][tx] = true;
 			}
 			
+			
+			//prune out if impossible to transmit
+			
+			
+			double total = 0.0;
+			
+			for (int tx=t0[i]; tx<t0[i]+td[i]; tx++) {
+				
+				for (int k=0; k<K; k++) {
+					
+					double hasil = 1.0;
+					
+					for (int r=0; r<R; r++) {
+						hasil *= initSinr[tx][k][r][userId[i]];
+					}
+					double stk = Math.pow(hasil, 1.0 / R);
+					
+					total += R * Math.log(1.0 + stk) / Math.log(2.0);
+					
+				}
+			}
+			
+			if (N == 2 && K == 2 && T == 2 && R == 1) {
+				//pass
+			} else if (192.0 * total < tbs[i]) { // we cannot fulfil this frame
+				//throw new IllegalArgumentException("powerful frame");
+				
+				for (int tx=t0[i]; tx<t0[i]+td[i]; tx++) {
+					userTime[userId[i]][tx] = false;
+				}
+			}
 		}
 		
 		for (int t=0; t<T; t++) { // time
