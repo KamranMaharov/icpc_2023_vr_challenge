@@ -162,6 +162,35 @@ public class Main {
 				}
 			}
 			
+			
+			
+			double[][] somethingElse = new double[N][R];
+			
+			for (int ux=0; ux<N; ux++) {
+				
+				if (!userTime[ux][t])
+					continue;
+				
+				for (int r=0; r<R; r++) {
+					//somethingElse[ux][r] = 1.0;
+					somethingElse[ux][r] = 1.0;
+					
+					for (int k=0; k<K; k++) {
+						//somethingElse[ux][r] *= initSinr[t][k][r][ux];
+						
+						somethingElse[ux][r] *= initSinr[t][k][r][ux];
+					}
+					
+					//tbs[userTimeToFrame[ux][t]]
+					
+					
+					somethingElse[ux][r] = 192.0 * Math.log(somethingElse[ux][r]) / Math.log(2.0)
+										/ tbs[userTimeToFrame[ux][t]];
+					
+				}
+			}
+			
+			
 			int[] matchResource = new int[R];
 			int[] userMatchCnt = new int[N];
 			
@@ -188,9 +217,15 @@ public class Main {
 						continue;
 					
 					
-					if (userMatchCnt[ux] == minCount &&
+					/*if (userMatchCnt[ux] == minCount &&
 							urPoints[ux][r] > max_value) {
 						max_value = urPoints[ux][r];
+						match_user = ux;
+					}*/
+					
+					if (userMatchCnt[ux] == minCount &&
+							somethingElse[ux][r] > max_value) {
+						max_value = somethingElse[ux][r];
 						match_user = ux;
 					}
 				}
