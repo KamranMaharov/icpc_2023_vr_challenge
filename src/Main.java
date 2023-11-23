@@ -1,5 +1,4 @@
 import java.io.*;
-import java.util.*;
 
 public class Main {
 	
@@ -92,6 +91,9 @@ public class Main {
 		boolean[][] userTime = new boolean[N][T];
 		int[][] userTimeToFrame = new int[N][T];
 		
+		
+		int initDiscarded = 0;
+		
 		for (int i=0; i<J; i++) {
 			String[] line = in.readLine().split(" ");
 			
@@ -133,12 +135,16 @@ public class Main {
 				//pass
 			} else if (192.0 * total < tbs[i]) { // we cannot fulfil this frame
 				//throw new IllegalArgumentException("powerful frame");
+				initDiscarded++;
 				
 				for (int tx=t0[i]; tx<t0[i]+td[i]; tx++) {
 					userTime[userId[i]][tx] = false;
 				}
 			}
 		}
+		
+		int fulfilled = 0;
+		int discarded = 0;
 		
 		for (int t=0; t<T; t++) { // time
 			
@@ -164,7 +170,7 @@ public class Main {
 			
 			
 			
-			double[][] somethingElse = new double[N][R];
+			double[][] resourceShare = new double[N][R];
 			
 			for (int ux=0; ux<N; ux++) {
 				
@@ -173,18 +179,18 @@ public class Main {
 				
 				for (int r=0; r<R; r++) {
 					//somethingElse[ux][r] = 1.0;
-					somethingElse[ux][r] = 1.0;
+					resourceShare[ux][r] = 1.0;
 					
 					for (int k=0; k<K; k++) {
 						//somethingElse[ux][r] *= initSinr[t][k][r][ux];
 						
-						somethingElse[ux][r] *= initSinr[t][k][r][ux];
+						resourceShare[ux][r] *= initSinr[t][k][r][ux];
 					}
 					
 					//tbs[userTimeToFrame[ux][t]]
 					
 					
-					somethingElse[ux][r] = 192.0 * Math.log(somethingElse[ux][r]) / Math.log(2.0)
+					resourceShare[ux][r] = 192.0 * (Math.log(resourceShare[ux][r]) / Math.log(2.0) )
 										/ tbs[userTimeToFrame[ux][t]];
 					
 				}
@@ -196,7 +202,9 @@ public class Main {
 			
 			
 			for (int r=0; r<R; r++) {
-				double max_value = -1.0;
+				double max_value = -1e18;
+				//out.write(max_value + "\n");
+				//out.flush();
 				matchResource[r] = -1;
 				int match_user = -1;
 				
@@ -222,21 +230,20 @@ public class Main {
 						max_value = urPoints[ux][r];
 						match_user = ux;
 					}*/
-					
+
 					if (userMatchCnt[ux] == minCount &&
-							somethingElse[ux][r] > max_value) {
-						max_value = somethingElse[ux][r];
+							resourceShare[ux][r] > max_value) {
+						max_value = resourceShare[ux][r];
 						match_user = ux;
 					}
 				}
-				
 				
 				if (activeUsers > 0) {
 					
 					matchResource[r] = match_user;
 					userMatchCnt[match_user]++;
 					
-					if (max_value < 0.0) {
+					if (max_value < -1e16) {
 						throw new IllegalArgumentException("no match!!!");
 					}
 				}
@@ -333,12 +340,43 @@ public class Main {
 				
 				if (allocatedBits[userTimeToFrame[ux][t]] >= tbs[userTimeToFrame[ux][t]]) {
 					int frameToDeactivate = userTimeToFrame[ux][t];
+					fulfilled++;
 					
 					
 					for (int tx=t0[frameToDeactivate];
 							tx<t0[frameToDeactivate]+td[frameToDeactivate]; tx++) {
 						userTime[ux][tx] = false;
 					}
+				} else {
+					
+					double total = 0.0;
+					
+					int frame = userTimeToFrame[ux][t];
+					
+					for (int tx=t+1; tx<t0[frame]+td[frame]; tx++) {
+						
+						for (int k=0; k<K; k++) {
+							
+							double hasil = 1.0;
+							
+							for (int r=0; r<R; r++) {
+								hasil *= initSinr[tx][k][r][ux];
+							}
+							double stk = Math.pow(hasil, 1.0 / R);
+							
+							total += R * Math.log(1.0 + stk) / Math.log(2.0);
+							
+						}
+					}
+					
+					if (allocatedBits[frame] + total * 192.0 < tbs[frame]) {
+						
+						discarded++;
+						for (int tx=t+1; tx<t0[frame]+td[frame]; tx++) {
+							userTime[ux][tx] = false;
+						}
+					}
+					
 				}
 				
 			}
@@ -347,6 +385,11 @@ public class Main {
 			
 		} // time (t)
 		
+		if (initDiscarded + discarded + fulfilled != J) {
+			throw new IllegalArgumentException("no way");
+		}
+		
+		//out.write(J + " " + initDiscarded + " " + discarded + " " + fulfilled + "\n");
 		//if (R >= N) {
 		//	throw new IllegalArgumentException("a b c d e");
 		//}
