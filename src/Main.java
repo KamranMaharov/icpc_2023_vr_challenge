@@ -1,52 +1,91 @@
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+
+import java.util.Comparator;
+import java.util.HashMap;
 
 public class Main {
 	
-	
-	static class Scanner {
-		Scanner(InputStream in) { this.in = in; } InputStream in;
-		byte[] bb = new byte[200000 * 19]; int i, n;
-		byte getc() {
-			if (i == n) {
-				i = n = 0;
-				try { n = in.read(bb); } catch (IOException e) {}
+	private static class MaskGetter {
+		int count;
+		List<Integer> masks;
+		int maskIdx;
+		
+		void recurse(int object, int number, int mask) {
+			if (number == 7)
+				return;
+			
+			mask ^= (1 << object);
+			masks.add(mask);
+			
+			for (int nextObject = object + 1; nextObject < count; nextObject++) {
+				recurse(nextObject, number + 1, mask);
 			}
-			return i < n ? bb[i++] : 0;
 		}
 		
-		boolean isdigit(byte c) {
-			return c >= (byte)'0' && c <= (byte)'9';
+		MaskGetter(int count) {
+			this.count = count;
+			this.masks = new ArrayList<>();
+			
+			for (int start = 0; start < this.count; start++) {
+				recurse(start, 1, 0);
+			}
+			
+			this.maskIdx = 0;
 		}
 		
-		int nextInt() {
-			/*byte c = 0; while (c <= ' ') c = getc();
-			boolean negate = false;
-			if (c == '-') {
-				negate = true;
-				c = getc();
-			}*/
-			byte c = 0; while (!isdigit(c)) c = getc();
-			int a = 0; while (isdigit(c)) { a = a * 10 + c - '0'; c = getc(); }
-			//if (negate) a = -a;
-			return a;
-		}
-		
-		long nextLong() {
-			byte c = 0; while (c <= ' ') c = getc();
-			long a = 0; while (c > ' ') { a = a * 10 + c - '0'; c = getc(); }
-			return a;
+		int next() {
+			if (maskIdx < masks.size()) {
+				return masks.get(maskIdx++);
+			}
+			return -1;
 		}
 	}
 	
+	
+	private static class ResourceCell implements Comparable<ResourceCell> {
+		int r;
+		int k;
+		double signal;
+		
+		ResourceCell(
+				int r,
+				int k,
+				double signal) {
+			this.r = r;
+			this.k = k;
+			this.signal = signal;
+		}
+
+		@Override
+		public int compareTo(Main.ResourceCell other) {
+			if (this.signal == other.signal)
+				return 0;
+			else if (this.signal > other.signal)
+				return -1;
+			return 1;
+		}
+		
+		
+	}
 	
 	
 	public static void main(String[] args) throws Exception {
 		BufferedReader in = new BufferedReader(new InputStreamReader(System.in), 200000 * 20);
 		BufferedWriter out = new BufferedWriter(new OutputStreamWriter(System.out), 50000000);
-		//Scanner in = new Scanner(System.in);		
 		
-		//out.write(Integer.parseInt("3") + "\n");
-		//out.flush();
 		
 		int N = Integer.parseInt(in.readLine()); //users <= 100
 		int K = Integer.parseInt(in.readLine()); //cells <= 10
@@ -94,6 +133,8 @@ public class Main {
 		
 		int initDiscarded = 0;
 		
+		boolean oneTimed = false;
+		
 		for (int i=0; i<J; i++) {
 			String[] line = in.readLine().split(" ");
 			
@@ -112,6 +153,8 @@ public class Main {
 			
 			//prune out if impossible to transmit
 			
+			if (td[i] == 1)
+				oneTimed = true;
 			
 			double total = 0.0;
 			
@@ -138,261 +181,586 @@ public class Main {
 				initDiscarded++;
 				
 				for (int tx=t0[i]; tx<t0[i]+td[i]; tx++) {
-					userTime[userId[i]][tx] = false;
+					//userTime[userId[i]][tx] = false;
 				}
 			}
 		}
 		
-		int fulfilled = 0;
-		int discarded = 0;
+		//following 2 var's are in sync
+		int fulfilledV1 = 0;
+		int fulfilledV2 = 0;
 		
-		for (int t=0; t<T; t++) { // time
+		int totalShareables = 0;
+		int totalBestCount = 0;
+		int totalExtraAdded = 0;
+		
+		int totalAllocs = 0;
+		
+		for (int t=0; t<T; t++) {
+			//out.write("TIME " + t + "\n");
 			
-			int activeUsers = 0;
-			for (int ux=0; ux<N; ux++) {
-				if (userTime[ux][t]) {
-					activeUsers++;
-				}
-			}
 			
-			double[][] urPoints = new double[N][R];
+
+			double[] cellPower = new double[K];
+			double[][] cellResourcePower = new double[K][R];
+			double[][][] userCellResourcePower = new double[N][K][R];
 			
-			for (int ux=0; ux<N; ux++) {
-				for (int r=0; r<R; r++) {
-					urPoints[ux][r] = 1.0;
-					
-					for (int k=0; k<K; k++) {
-						urPoints[ux][r] *= initSinr[t][k][r][ux];
-					}
-					
-				}
-			}
+			Set<Integer> bestResources = new HashSet<>();
 			
 			
 			
-			double[][] resourceShare = new double[N][R];
 			
-			for (int ux=0; ux<N; ux++) {
-				
-				if (!userTime[ux][t])
-					continue;
-				
-				for (int r=0; r<R; r++) {
-					//somethingElse[ux][r] = 1.0;
-					resourceShare[ux][r] = 1.0;
-					
-					for (int k=0; k<K; k++) {
-						//somethingElse[ux][r] *= initSinr[t][k][r][ux];
-						
-						resourceShare[ux][r] *= initSinr[t][k][r][ux];
-					}
-					
-					//tbs[userTimeToFrame[ux][t]]
-					
-					
-					resourceShare[ux][r] = 192.0 * (Math.log(resourceShare[ux][r]) / Math.log(2.0) )
-										/ tbs[userTimeToFrame[ux][t]];
-					
-				}
-			}
+			for (int iter = 1; iter <= 3; iter++) {
 			
 			
-			int[] matchResource = new int[R];
-			int[] userMatchCnt = new int[N];
-			
+			List<Integer>[][] shared = new List[R][K];
 			
 			for (int r=0; r<R; r++) {
-				double max_value = -1e18;
-				//out.write(max_value + "\n");
-				//out.flush();
-				matchResource[r] = -1;
-				int match_user = -1;
-				
-				int minCount = Integer.MAX_VALUE;
-				
-				for (int ux=0; ux<N; ux++) {	
-					if (!userTime[ux][t])
-						continue;
-					
-					if (userMatchCnt[ux] < minCount) {
-						minCount = userMatchCnt[ux];
-					}
+				for (int k=0; k<K; k++) {
+					shared[r][k] = new ArrayList<>();
+				}
+			}
+			
+			for (int ux=0; ux<N; ux++) {
+				if (!userTime[ux][t]) {
+					continue;
 				}
 				
+				for (int r=0; r<R; r++) {
+					
+					
+					if (bestResources.contains(r)) {
+						continue;
+					}
+					
+					
+					for (int k=0; k<K; k++) {
+						
+						double canBeGiven = Math.min(4.0 - cellResourcePower[k][r], R - cellPower[k]);
+						
+						if (tbs[userTimeToFrame[ux][t]] < allocatedBits[userTimeToFrame[ux][t]])
+							throw new IllegalArgumentException("get out!!!");
+						if (t0[userTimeToFrame[ux][t]] + td[userTimeToFrame[ux][t]] <= t)
+							throw new IllegalArgumentException("get out!!!");
+						
+						if ( 1.0 * (tbs[userTimeToFrame[ux][t]] - allocatedBits[userTimeToFrame[ux][t]]) 
+								<= 192 * Math.log(1.0 + canBeGiven * initSinr[t][k][r][ux]) / Math.log(2.0) ) {
+							//out.write("time " + t + " STRONG " + ux + " " + r + " " + k + " " +
+							//		tbs[userTimeToFrame[ux][t]] + " " + 192 * Math.log(1.0 + initSinr[t][k][r][ux]) / Math.log(2.0) +	"\n");
+							shared[r][k].add(ux);
+						}
+					}
+				}
+			}
+			
+			
+			int bestUserCount = 1;
+			Map<Integer, Double> bestPowerDist = new HashMap<>();
+			int bestResource = -1;
+			int bestCell = -1;
+			
+			for (int r=0; r<R; r++) {
 				
-				for (int ux=0; ux<N; ux++) {	
-					if (!userTime[ux][t])
+				for (int k=0; k<K; k++) {
+					if (shared[r][k].size() == 0)
 						continue;
 					
+					//out.write("SH " + r + ", " + k + " ::::::  ");
+					//for (Integer ux : shared[r][k]) {
+					//	out.write(ux + " ");
+					//}
+					//out.write("\n");
 					
-					/*if (userMatchCnt[ux] == minCount &&
-							urPoints[ux][r] > max_value) {
-						max_value = urPoints[ux][r];
-						match_user = ux;
-					}*/
+					
+					
+					
 
-					if (userMatchCnt[ux] == minCount &&
-							resourceShare[ux][r] > max_value) {
-						max_value = resourceShare[ux][r];
-						match_user = ux;
-					}
-				}
-				
-				if (activeUsers > 0) {
+					int num = shared[r][k].size();
 					
-					matchResource[r] = match_user;
-					userMatchCnt[match_user]++;
+					MaskGetter mg = new MaskGetter(shared[r][k].size());
 					
-					if (max_value < -1e16) {
-						throw new IllegalArgumentException("no match!!!");
+
+					for (int mask=mg.next(); mask != -1; mask = mg.next()) {
+						
+						if (Integer.bitCount(mask) <= bestUserCount ||
+								Integer.bitCount(mask) > 6) { // best user found has more users
+							continue;
+						}
+						
+						List<Integer> subUsers = new ArrayList<>();
+						for (int idx=0; idx<num; idx++) {
+							if ((mask & (1<<idx)) == 0)
+								continue;
+							
+							subUsers.add(shared[r][k].get(idx));
+						}
+						
+						if (Integer.bitCount(mask) != subUsers.size())
+							throw new IllegalArgumentException("no way!!!");
+						
+						double totalPower = 0.0;
+						Map<Integer, Double> powerDist = new HashMap<>();
+						
+						for (int idx1=0; idx1<subUsers.size(); idx1++) {
+							
+							
+							double interference = 1.0;
+							
+							
+							for (int idx2=0; idx2<subUsers.size(); idx2++) {
+								if (idx1 == idx2)
+									continue;
+								
+								interference *= Math.pow(Math.E,
+										dfactor[k][r][subUsers.get(idx1)][subUsers.get(idx2)]);
+									
+							}
+							
+							int user1 = subUsers.get(idx1);
+							
+							if (tbs[userTimeToFrame[user1][t]] < allocatedBits[userTimeToFrame[user1][t]])
+								throw new IllegalArgumentException("get out!!!");
+							if (t0[userTimeToFrame[user1][t]] + td[userTimeToFrame[user1][t]] <= t)
+								throw new IllegalArgumentException("get out!!!");
+							
+							double power = ( Math.pow(2.0, 1.0 * (tbs[userTimeToFrame[user1][t]] - allocatedBits[userTimeToFrame[user1][t]])
+									 / 192.0)  - 1.0 ) /
+												(initSinr[t][k][r][user1] * interference);
+							if (power < 0.0) {
+								throw new IllegalArgumentException("fdsaff");
+								//out.write("POWER " + " " + power + "\n");
+							}
+							totalPower += power;
+							
+							if (totalPower > Math.min(4.0 - cellResourcePower[k][r], R - cellPower[k])) {
+								break;
+							}
+							
+							
+							powerDist.put(user1, power);
+							//out.write("POWER " + power + "\n");
+						}
+						
+						if (totalPower <= Math.min(4.0 - cellResourcePower[k][r], R - cellPower[k])) {
+							bestUserCount = subUsers.size();
+							bestPowerDist = powerDist;
+							bestResource = r;
+							bestCell = k;
+						}
+						
+						//out.write(null);
+						if (totalPower <= 4.0) {
+							//out.write("    TOTAL " + totalPower + " " + mask + " :::: " + "  , USERS: ");
+							//for (final Integer user : subUsers) {
+							//	out.write(user + " ");
+							//}
+							//out.write("\n");
+						}
 					}
+
 				}
 			}
 			
 			
 			
 			
-			for (int k=0; k<K; k++) { // cell
-				
-				
-				//int chosenUser = 0;
-				
-				for (int r=0; r<R; r++) { //freq rbg
-					//chosenUser++;
-					//chosenUser++;
-					
-					
-					
-					double sumDebugger = 0.0;
-					
-					//int currentUser = 0;
-					
-					// 4.0 / N -> power range for each RBG -> [0; 4]
-					// 1.0 / N -> power range for all RBGs -> [0; R]
-					
-					
-					for (int n=0; n<N; n++) {
-						
-						if (matchResource[r] == n) {
-							out.write(1.0 + " ");
-							sumDebugger += 1.0;
-							
-							/*if (matchUser[n] != r) {
-								throw new IllegalArgumentException("match failure");
-							}*/
-
-						} else {
-							out.write(0.0 + " ");
-							sumDebugger += 0.0;
-						}
-						
-						
-					} // users (n)
-					
-					if (activeUsers > 0) {
-					
-						if (sumDebugger < 0.999999 || sumDebugger > 1.000001) {
-							throw new IllegalArgumentException("a b c d e");
-						}
-					} else {
-						if (sumDebugger > 1e-9) {
-							throw new IllegalArgumentException("a b c d e");
-						}
-					}
-					
-					out.write("\n");
-					
-					
-					//xxx * N * R <= R
-				} //rgb (freq resource, r)
-			} // cells (k)
 			
 			
 			
-			for (int ux=0; ux<N; ux++) {
-				
-				if (!userTime[ux][t])
-					continue;
-				
-				for (int k=0; k<K; k++) {
-					
-					double hasil = 1.0;
-					int activeRbg = 0;
-					
-					for (int r=0; r<R; r++) {
-						
-						if (matchResource[r] != ux)
-							continue;
-						
-						hasil *= initSinr[t][k][r][ux];
-						activeRbg++;
-					}
-					
-					if (activeRbg != 0) {
-						double stk = Math.pow(hasil, 1.0 / activeRbg);
-						
-						
-						allocatedBits[userTimeToFrame[ux][t]] += 192.0 * activeRbg * Math.log(1.0 + stk) / Math.log(2.0);
-						
-					}
-					
+			if (bestCell >= 0) {
+				double alreadyPowered = 0.0;
+				for (final Double pw : bestPowerDist.values()) {
+					alreadyPowered += pw;
 				}
 				
-				if (allocatedBits[userTimeToFrame[ux][t]] >= tbs[userTimeToFrame[ux][t]]) {
-					int frameToDeactivate = userTimeToFrame[ux][t];
-					fulfilled++;
-					
-					
-					for (int tx=t0[frameToDeactivate];
-							tx<t0[frameToDeactivate]+td[frameToDeactivate]; tx++) {
-						userTime[ux][tx] = false;
-					}
-				} else {
-					
-					double total = 0.0;
+				cellPower[bestCell] += alreadyPowered;
+				cellResourcePower[bestCell][bestResource] += alreadyPowered;
+				bestResources.add(bestResource);
+				
+				//out.write("TIME " + t + " ::: USERS :: ");
+				
+				for (final Integer ux : bestPowerDist.keySet()) {
+					//out.write(ux + " ");
+					userCellResourcePower[ux][bestCell][bestResource] = bestPowerDist.get(ux);
 					
 					int frame = userTimeToFrame[ux][t];
 					
-					for (int tx=t+1; tx<t0[frame]+td[frame]; tx++) {
+					if (1.0 * (tbs[frame] - allocatedBits[frame])  <= 0.0) {
+						throw new IllegalArgumentException("fdafafa");
+					}
+					
+					allocatedBits[frame] += 1.0 * (tbs[frame] - allocatedBits[frame]);
+					
+					
+					if (allocatedBits[frame] >= tbs[frame]) {
+						//out.write("full_allocation " + ux + " during subset force" + "\n");
+						
+						
+						for (int tt=t0[frame];
+								tt<t0[frame] + td[frame];
+								tt++) {
+							userTime[ux][tt] = false;
+						}
+						
+						
+						totalAllocs++;
+						
+					}
+					
+				}
+				
+				//out.write("\n");
+				//out.write("resource _ cell : " + bestResource + " " + bestCell + "\n");
+				
+			}
+			
+			
+			
+			}
+			
+			int reman = 0;
+			for (int r=0; r<R; r++) {	
+				if (bestResources.contains(r))
+					continue;
+				reman++;
+			}
+			
+			boolean[] reserved = new boolean[R];
+			
+			for (int r=0; r<R; r++) {
+				
+				if (bestResources.contains(r))
+					continue;
+				
+				boolean breakable = false;
+				
+				for (int ux=0; ux<N; ux++) {
+					
+					if (!userTime[ux][t]) {
+						continue;
+					}
+					
+					for (double maxPower = 0.05; maxPower <= 4.0; maxPower += 0.05) {
+					
+					double total = 0.0;
+					
+					for (int k=0; k<K; k++) {
+						
+						// give power in bestCell
+						
+						if (cellPower[k] > R || cellResourcePower[k][r] > 4.0) {
+							throw new IllegalArgumentException("no way!!!");
+						}
+						
+						double power = Math.min( Math.min(maxPower, 1.0 * (R - cellPower[k]) / reman),
+								Math.min(R - cellPower[k], 4 - cellResourcePower[k][r]) );
+						
+						
+						total += Math.log(1.0 + power * initSinr[t][k][r][ux]) / Math.log(2);
+						
+					}
+					
+					if (allocatedBits[userTimeToFrame[ux][t]] + total * 192.0 >=
+							tbs[userTimeToFrame[ux][t]]) {
+						
+						allocatedBits[userTimeToFrame[ux][t]] += total * 192.0;
 						
 						for (int k=0; k<K; k++) {
 							
-							double hasil = 1.0;
+							// give power in bestCell
 							
-							for (int r=0; r<R; r++) {
-								hasil *= initSinr[tx][k][r][ux];
+							if (cellPower[k] > R || cellResourcePower[k][r] > 4.0) {
+								throw new IllegalArgumentException("no way!!!");
 							}
-							double stk = Math.pow(hasil, 1.0 / R);
 							
-							total += R * Math.log(1.0 + stk) / Math.log(2.0);
+							double power = Math.min(Math.min(maxPower, 1.0 * (R - cellPower[k]) / reman),
+									Math.min(R - cellPower[k], 4 - cellResourcePower[k][r]) );
 							
+							userCellResourcePower[ux][k][r] = power;
+							cellPower[k] += power;
+							cellResourcePower[k][r] += power;	
 						}
-					}
-					
-					if (allocatedBits[frame] + total * 192.0 < tbs[frame]) {
 						
-						discarded++;
-						for (int tx=t+1; tx<t0[frame]+td[frame]; tx++) {
-							userTime[ux][tx] = false;
+						reserved[r] = true;
+						
+						for (int tt=t0[userTimeToFrame[ux][t]];
+								tt<t0[userTimeToFrame[ux][t]] + td[userTimeToFrame[ux][t]];
+								tt++) {
+							userTime[ux][tt] = false;
 						}
+						
+						
+						totalAllocs++;
+						breakable = true;
+						break;
+						
 					}
 					
+					
+					}
+					
+					if (breakable)
+						break;
+					
+				}
+				reman--;
+			}
+			
+			
+			/*
+			for (int ux=0; ux<N; ux++) {
+				if (!userTime[ux][t]) {
+					continue;
+				}
+				
+				
+				for (int r=0; r<R; r++) {
+					if (bestResources.contains(r) || reserved[r])
+						continue;
+					
+					List<ResourceCell> rcs = new ArrayList<>();
+					
+					for (int k=0; k<K; k++) {
+						rcs.add(new ResourceCell(r, k, initSinr[t][k][r][ux]));
+					}
+					
+					Collections.sort(rcs);
+					
+					double total = 0.0;
+					
+					for (int ki=0; ki<K; ki++) {
+						int k = rcs.get(ki).k;
+						
+						double powerLeft = Math.min(4.0,
+								Math.min(R - cellPower[k], 4.0 - cellResourcePower[k][r]));
+						
+						total += Math.log(1.0 + initSinr[t][k][r][ux] * powerLeft) / Math.log(2.0);
+					}
+					
+					
+					
+					
+					if (allocatedBits[userTimeToFrame[ux][t]] + total * 192.0 >=
+							tbs[userTimeToFrame[ux][t]]) {
+						
+						allocatedBits[userTimeToFrame[ux][t]] += total * 192.0;
+						
+						for (int ki=0; ki<K; ki++) {
+							int k = rcs.get(ki).k;
+							// give power in bestCell
+							
+							if (cellPower[k] > R || cellResourcePower[k][r] > 4.0) {
+								throw new IllegalArgumentException("no way!!!");
+							}
+							
+							double power = Math.min(4.0,
+									Math.min(R - cellPower[k], 4 - cellResourcePower[k][r]) );
+							
+							userCellResourcePower[ux][k][r] = power;
+							cellPower[k] += power;
+							cellResourcePower[k][r] += power;	
+						}
+						
+						reserved[r] = true;
+						
+						for (int tt=t0[userTimeToFrame[ux][t]];
+								tt<t0[userTimeToFrame[ux][t]] + td[userTimeToFrame[ux][t]];
+								tt++) {
+							userTime[ux][tt] = false;
+						}
+						
+						
+						totalAllocs++;
+						break;
+						
+					}
+					
+					
+					
+					
+					
+					
+				}
+				
+			}*/
+			
+			
+			
+			
+			
+			
+			double[] currentAlloc = new double[N];
+			boolean[][] choice = new boolean[R][N];
+			
+			int resRemaining = 0;
+			
+			for (int r=0; r<R; r++) {	
+				if (bestResources.contains(r) || reserved[r])
+					continue;
+				resRemaining++;
+			}
+			
+			for (int r=0; r<R; r++) {
+				
+				if (bestResources.contains(r) || reserved[r])
+					continue;
+				
+				double maxdiff = 0.0;
+				double okpower = 0.0;
+				double nextAlloc = -1.0;
+				int user = -1;
+				
+				for (int ux=0; ux<N; ux++) {
+					
+					if (!userTime[ux][t]) {
+						continue;
+					}
+					
+					
+					for (double maxPower = 0.1; maxPower <= 4.0; maxPower += 0.1) {
+					
+					choice[r][ux] = true;
+					
+					double total = 0.0;
+					
+					for (int k=0; k<K; k++) {
+						
+						int bCount = 0;
+						
+						double hasil = 1.0;
+						
+						for (int ri=0; ri<R; ri++) {
+							if (choice[ri][ux]) {
+								bCount++;
+								
+								double power = -1;
+								if (ri == r) {
+									power = Math.min(
+												Math.min(1.0 * (R-cellPower[k]) / resRemaining, maxPower),
+												Math.min(R - cellPower[k], 4.0 - cellResourcePower[k][ri]));
+								} else {
+									power = userCellResourcePower[ux][k][ri];
+								}
+								
+								hasil *= power * initSinr[t][k][ri][ux];
+							}
+						}
+						
+						double snt = Math.pow(hasil, 1.0 / bCount);
+						total += bCount * Math.log(1.0 + snt) / Math.log(2.0);
+					}
+					
+					double diff = Math.min(total * 192.0 - currentAlloc[ux], tbs[userTimeToFrame[ux][t]] - allocatedBits[userTimeToFrame[ux][t]]) /
+							(tbs[userTimeToFrame[ux][t]] - allocatedBits[userTimeToFrame[ux][t]]);
+					
+					if (diff > maxdiff) {
+						maxdiff = diff ;
+						okpower = maxPower;
+						nextAlloc = total * 192.0;
+						user = ux;
+					}
+					
+					choice[r][ux] = false;
+					
+					
+					
+					}
+					
+					
+					
+				}
+				
+				if (user >= 0) {
+					choice[r][user] = true;
+					allocatedBits[userTimeToFrame[user][t]] += (nextAlloc - currentAlloc[user]);
+					currentAlloc[user] = nextAlloc;
+					
+					for (int k=0; k<K; k++) {
+						double power = Math.min(
+								Math.min(1.0 * (R-cellPower[k]) / resRemaining, okpower),
+								Math.min(R - cellPower[k], 4.0 - cellResourcePower[k][r]));
+						cellPower[k] += power;
+						cellResourcePower[k][r] += power;
+						userCellResourcePower[user][k][r] = power;
+					}
+					
+					//out.write("allocating resource " + r + " to user " + user + "\n");
+					
+					if (allocatedBits[userTimeToFrame[user][t]] >= tbs[userTimeToFrame[user][t]]) {
+						//out.write("full_allocation " + user + "\n");
+						
+						
+						for (int tt=t0[userTimeToFrame[user][t]];
+								tt<t0[userTimeToFrame[user][t]] + td[userTimeToFrame[user][t]];
+								tt++) {
+							userTime[user][tt] = false;
+						}
+						
+						
+						totalAllocs++;
+						
+					}
+					
+				}
+				resRemaining--;
+				
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+
+			for (int k=0; k<K; k++) {	
+				
+				for (int r=0; r<R; r++) {
+					
+					
+					
+					for (int ux=0; ux<N; ux++) {
+					
+					
+						out.write(userCellResourcePower[ux][k][r] + " ");
+						
+						
+					}
+					
+					out.write("\n");
 				}
 				
 			}
 			
 			
 			
-		} // time (t)
-		
-		if (initDiscarded + discarded + fulfilled != J) {
-			throw new IllegalArgumentException("no way");
 		}
 		
-		//out.write(J + " " + initDiscarded + " " + discarded + " " + fulfilled + "\n");
-		//if (R >= N) {
-		//	throw new IllegalArgumentException("a b c d e");
-		//}
+		
+		//out.write(totalAllocs + "\n");
+		
+		//out.write(totalxxBestCount + "\n");
+		//out.write(totalShareables + "\n");
+		//out.write(totalExtraAdded + "\n");
+		//if (fulfilledV1 != fulfilledV2)
+	//		throw new IllegalArgumentException("inconsistency");
+		
+	//	if (fulfilledV1 < J * 0.4 && false) {
+	//		throw new IllegalArgumentException("too low signals");
+	//	}
+		
+		//out.write(J + " " + fulfilledV1 + " " + fulfilledV2 + "\n");
+		//out.write(J + " " + initDixscarded + " " + fulfilledV1 + " " + discarded + "\n");
 		
 		in.close();
 		out.close();
